@@ -1,3 +1,9 @@
+#2018.03.28  
+#StockPredict V1.0.0
+##待解决批次处理问题
+#每次训练完一次后，重新开始就不收敛了？还是要做批训练
+
+
 import tensorflow as tf 
 import numpy as np 
 import pandas as pd 
