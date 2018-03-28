@@ -1,7 +1,8 @@
 #2018.03.28  
-#StockPredict V1.0.0
-##待解决批次处理问题
-#每次训练完一次后，重新开始就不收敛了？还是要做批训练
+#StockPredict V1.0.1
+##已使用批次处理问题
+#并保存每次模型参数
+#但loss总是在0.21左右无法下降
 
 
 import tensorflow as tf 
@@ -10,10 +11,10 @@ import pandas as pd
 
 #定义网络参数
 inputSize = 10
-hidenNodeSize = 15
+hidenNodeSize = 10
 outputSize = 1
-batchSize = 1
-learnRate = 0.03
+batchSize = 5
+learnRate = 0.001
 
 #导入测试数据
 f = open("stockdata_v1.csv")
@@ -44,12 +45,12 @@ biases = {
 
 #定义前向过程
 def bpnn(train_x):
-    train_x1 = tf.reshape(train_x,shape = [1,10])           #本来只是一个行向量，重整为矩阵以得张量运算
+    #train_x1 = tf.reshape(train_x,shape = [None,10])           #本来只是一个行向量，重整为矩阵以得张量运算
     w_in = weights['in']
     b_in = biases['in']
     w_out = weights['out']
     b_out = biases['out']
-    input_data = tf.matmul(train_x1,w_in) + b_in
+    input_data = tf.matmul(train_x,w_in) + b_in
     #hidenLay_out = tf.nn.relu(input_data)
     nn_out = tf.matmul(input_data,w_out) +b_out
     return nn_out
@@ -57,24 +58,28 @@ def bpnn(train_x):
 #定义训练过程
 def nn_train(train_x,train_y):
     #定义数据承载空间
-    X = tf.placeholder(tf.float32,shape = [inputSize],name = 'inputdata')
-    Y = tf.placeholder(tf.float32,shape = [outputSize],name = 'outputdata')
+    X = tf.placeholder(tf.float32,shape = [None,inputSize],name = 'inputdata')
+    Y = tf.placeholder(tf.float32,shape = [None,outputSize],name = 'outputdata')
 
     predict_y = bpnn(X)
     #定义损失函数和优化器
-    loss = tf.reduce_mean(tf.square(predict_y - Y))
+    loss = tf.reduce_mean(tf.square(tf.reshape(predict_y,[-1]) - tf.reshape(Y,[-1])))
     train_op = tf.train.AdamOptimizer(learnRate).minimize(loss)
+    #定义模型保存器
+    modelSaver = tf.train.Saver(tf.global_variables(),max_to_keep=15)
     #定义会话过程
     with tf.Session() as sess: 
         #先初始化所有变量
         sess.run(tf.global_variables_initializer())
 
         for i in range(2000):  #训练次数
-            for step in range(len(train_x)): #每次训练进度
-                loss_ = sess.run([train_op,loss],feed_dict = {X:train_x[step],Y:train_y[step]})
-                print(i,loss_)
+            for step in range(0,len(train_x) - batchSize,batchSize): #每次训练进度
+                loss_ = sess.run([train_op,loss],feed_dict = {X:train_x[step:step + batchSize,:],Y:train_y[step:step + batchSize,:]})
+            print(i,loss_)
+            #保存模型变量参数
+            if(i%200 == 0):
+                print('保存模型：',modelSaver.save(sess,'./modelsave/StockPredict.model',global_step=i))
 
-train_x,train_y = GetTrainData(batchSize,16,1989)
+train_x,train_y = GetTrainData(batchSize,17,1989)
 nn_train(train_x,train_y)
-#待解决批次处理问题
-#每次训练完一次后，重新开始就不收敛了？还是要做批训练
+
